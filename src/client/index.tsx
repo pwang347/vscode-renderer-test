@@ -36,7 +36,7 @@ export const activate = async (context: RendererContext<any>) => {
 
     defaultRenderer.experimental_registerHtmlRenderingHook({
         postRender: (outputItem: OutputItem, element: HTMLElement): HTMLElement | undefined => {
-            console.log("@@POST RENDER", outputItem);
+            console.log("@@outputItem", outputItem);
 			return element;
         }
     });
