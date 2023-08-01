@@ -2,9 +2,24 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import './style.css';
 
-import { IssuesList } from './render';
 import errorOverlay from 'vscode-notebook-error-overlay';
-import type { ActivationFunction } from 'vscode-notebook-renderer';
+import type { ActivationFunction, OutputItem, RendererContext, RendererApi } from 'vscode-notebook-renderer';
+import { IssuesList } from './render';
+
+// see https://github.com/mjbvz/vscode/blob/f45281d226d720f02166f01afd822a0282c7be0f/extensions/notebook-renderers/src/index.ts#L13-L20
+interface IHTMLRenderingHook {
+    /**
+     * Invoked after the output item has been rendered but before it has been appended to the document.
+     *
+     * @return A new `HTMLElement` or `undefined` to continue using the provided element.
+     */
+    postRender(outputItem: OutputItem, element: HTMLElement): HTMLElement | undefined;
+}
+
+// see https://github.com/mjbvz/vscode/blob/f45281d226d720f02166f01afd822a0282c7be0f/extensions/notebook-renderers/src/index.ts#L294
+export interface IBuiltInRenderer extends RendererApi {
+    experimental_registerHtmlRenderingHook(hook: IHTMLRenderingHook): void;
+}
 
 // ----------------------------------------------------------------------------
 // This is the entrypoint to the notebook renderer's webview client-side code.
@@ -13,28 +28,16 @@ import type { ActivationFunction } from 'vscode-notebook-renderer';
 // rendering logic inside of the `render()` function.
 // ----------------------------------------------------------------------------
 
-export const activate: ActivationFunction = context => {
-  return {
-    renderOutputItem(outputItem, element) {
-      let shadow = element.shadowRoot;
-      if (!shadow) {
-        shadow = element.attachShadow({ mode: 'open' });
-        const root = document.createElement('div');
-        root.id = 'root';
-        shadow.append(root);
-      }
-      const root = shadow.querySelector<HTMLElement>('#root')!;
-      errorOverlay.wrap(root, () => {
-        root.innerHTML = '';
-        const node = document.createElement('div');
-        root.appendChild(node);
-
-        ReactDOM.render(<IssuesList info={{ container: node, mime: outputItem.mime, value: outputItem.json(), context }} />, root);
-      });
-    },
-    disposeOutputItem(outputId) {
-      // Do any teardown here. outputId is the cell output being deleted, or
-      // undefined if we're clearing all outputs.
+export const activate = async (context: RendererContext<any>) => {
+	const defaultRenderer = (await context.getRenderer("vscode.builtin-renderer")) as IBuiltInRenderer;
+    if (!defaultRenderer) {
+        throw new Error(`Could not load 'vscode.builtin-renderer'`);
     }
-  };
+
+    defaultRenderer.experimental_registerHtmlRenderingHook({
+        postRender: (outputItem: OutputItem, element: HTMLElement): HTMLElement | undefined => {
+            console.log("@@POST RENDER", outputItem);
+			return element;
+        }
+    });
 };
